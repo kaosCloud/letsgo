@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"database/sql"
 	"flag"
 	"github.com/alexedwards/scs/mysqlstore"
@@ -78,16 +79,24 @@ func main() {
 		sessionManager: sessionManager,
 	}
 
-	srv := http.Server{
-		Addr:    *addr,
-		Handler: app.routes(),
+	tlsConfig := &tls.Config{
+		CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256},
+	}
+	srv := &http.Server{
+		Addr:         *addr,
+		Handler:      app.routes(),
+		TLSConfig:    tlsConfig,
+		ErrorLog:     slog.NewLogLogger(logger.Handler(), slog.LevelError),
+		IdleTimeout:  time.Minute,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
 	}
 
 	// The value returned from flag.String() function is pointer to the flag value,
 	// not the value itself. That means that addr variable is actually a pointer, and we need
 	// to dereference it before using it.
 	logger.Info("starting server", "addr", *addr)
-	err = srv.ListenAndServe()
+	err = srv.ListenAndServeTLS("./tls/cert.pem", "./tls/key.pem")
 	logger.Error(err.Error())
 	os.Exit(1)
 
