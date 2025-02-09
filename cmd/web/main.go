@@ -3,6 +3,8 @@ package main
 import (
 	"database/sql"
 	"flag"
+	"github.com/alexedwards/scs/mysqlstore"
+	"github.com/alexedwards/scs/v2"
 	"github.com/go-playground/form/v4"
 	_ "github.com/go-sql-driver/mysql"
 	"html/template"
@@ -10,13 +12,15 @@ import (
 	"net/http"
 	"os"
 	"snippetbox.kaos.cloud/internal/models"
+	"time"
 )
 
 type application struct {
-	logger        *slog.Logger
-	snippets      *models.SnippetModel
-	templateCache map[string]*template.Template
-	formDecoder   *form.Decoder
+	logger         *slog.Logger
+	snippets       *models.SnippetModel
+	templateCache  map[string]*template.Template
+	formDecoder    *form.Decoder
+	sessionManager *scs.SessionManager
 }
 
 func openDB(dsn string) (*sql.DB, error) {
@@ -60,20 +64,30 @@ func main() {
 
 	formDecoder := form.NewDecoder()
 
+	sessionManager := scs.New()
+	sessionManager.Store = mysqlstore.New(db)
+	sessionManager.Lifetime = 12 * time.Hour
+
 	// Initialize a new instance of our application struct, containing the
 	// dependencies.
 	app := &application{
-		logger:        logger,
-		snippets:      &models.SnippetModel{DB: db},
-		templateCache: templateCache,
-		formDecoder:   formDecoder,
+		logger:         logger,
+		snippets:       &models.SnippetModel{DB: db},
+		templateCache:  templateCache,
+		formDecoder:    formDecoder,
+		sessionManager: sessionManager,
+	}
+
+	srv := http.Server{
+		Addr:    *addr,
+		Handler: app.routes(),
 	}
 
 	// The value returned from flag.String() function is pointer to the flag value,
 	// not the value itself. That means that addr variable is actually a pointer, and we need
 	// to dereference it before using it.
 	logger.Info("starting server", "addr", *addr)
-	err = http.ListenAndServe(*addr, app.routes())
+	err = srv.ListenAndServe()
 	logger.Error(err.Error())
 	os.Exit(1)
 
