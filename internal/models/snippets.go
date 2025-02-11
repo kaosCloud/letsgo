@@ -50,7 +50,7 @@ func (m *SnippetModel) Get(id int) (Snippet, error) {
 	var s Snippet
 
 	// Use row.Scan to copy the values from each field in sql.Row to the
-	// corresponding fields in Sippet struct.
+	// corresponding fields in Snippet struct.
 	err := row.Scan(&s.ID, &s.Title, &s.Content, &s.Created, &s.Expires)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
